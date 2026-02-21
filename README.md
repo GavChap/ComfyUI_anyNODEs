@@ -18,11 +18,20 @@ An enhanced version of the standard text generation node that provides more cont
 - `text`: The final cleaned response from the model.
 - `thought`: The extracted reasoning process or "hidden" thinking from the model.
 
-### 2. LoRA XY Integrated Sampler
-A powerful node for generating XY grids to compare different LoRA strengths and combinations.
-- Supports multiple LoRA slots with independent strength controls.
-- Automatically generates labels for the resulting grid.
-- Integrated sampling logic to streamline the comparison workflow.
+### 2. LoRA XY Samplers
+These nodes allow you to generate comparison grids for multiple LoRAs at varying strengths. They include an integrated sampling loop to make grid generation much faster than manual workflows.
+
+#### **LoRA XY Integrated Sampler (Standard)**
+Designed for standard workflows using a built-in KSampler logic.
+- **Usage**: Plug in your model, clip, and conditioning. Select up to 10 LoRAs in the optional slots.
+- **Strengths**: A multiline text box where you can list the strengths to test (e.g., `0.5`, `0.8`, `1.0`). Each LoRA will be tested at each strength.
+- **Baseline**: Enable `include_baseline` to show a "No LoRA" image at the start of the grid.
+- **Columns**: Control how many images appear per row in the final grid.
+
+#### **LoRA XY Integrated Sampler (Custom)**
+Designed for advanced workflows using the **Custom Sampler** infrastructure (Samplers/Sigmas/Noise).
+- **Usage**: Same LoRA selection logic as the standard version, but allows you to pipe in custom `SAMPLER` and `SIGMAS` nodes.
+- **Flexibility**: Ideal for use with specialized schedulers, PowerloRA, or complex noise injection workflows.
 
 ### 3. Lora Blender
 A utility node for blending multiple LoRAs together with weighted averages.
@@ -40,4 +49,7 @@ A utility node for blending multiple LoRAs together with weighted averages.
 
 ## Usage
 - **LLM Nodes**: Found under the `anyMODE/LLM` category.
-- **LoRA Nodes**: Found under the `anyMODE/LoRA` or `anyMODE/Sampling` categories.
+- **LoRA Nodes**: Found under the `anyMODE/batch` or `anyMODE/LoRA` categories.
+
+## Cross-Platform Support
+Internal label rendering uses a bundled **Roboto-Regular.ttf** font, ensuring that XY Grid labels render consistently across Windows and Linux without requiring system font installation.
