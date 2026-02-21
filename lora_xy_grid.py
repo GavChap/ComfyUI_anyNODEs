@@ -17,7 +17,11 @@ def get_grid_font():
     if _GRID_FONT is not None:
         return _GRID_FONT
     
+    # Prioritize bundled font
+    bundled_font_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Roboto-Regular.ttf")
+    
     font_paths = [
+        bundled_font_path,
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
