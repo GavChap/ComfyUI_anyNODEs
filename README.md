@@ -1,6 +1,6 @@
 # ComfyUI_anyNODEs
 
-A collection of specialized custom nodes for ComfyUI, designed to enhance text generation and LLM workflows.
+A collection of specialized custom nodes for ComfyUI, designed to enhance text generation, LLM workflows, and LoRA management.
 
 ## Nodes Included
 
@@ -18,6 +18,17 @@ An enhanced version of the standard text generation node that provides more cont
 - `text`: The final cleaned response from the model.
 - `thought`: The extracted reasoning process or "hidden" thinking from the model.
 
+### 2. LoRA XY Integrated Sampler
+A powerful node for generating XY grids to compare different LoRA strengths and combinations.
+- Supports multiple LoRA slots with independent strength controls.
+- Automatically generates labels for the resulting grid.
+- Integrated sampling logic to streamline the comparison workflow.
+
+### 3. Lora Blender
+A utility node for blending multiple LoRAs together with weighted averages.
+- Simplifies complex LoRA stacks into a single manageable output.
+- Useful for fine-tuning the influence of multiple stylistic or character LoRAs.
+
 ## Installation
 
 1. Navigate to your ComfyUI `custom_nodes` directory.
@@ -28,4 +39,5 @@ An enhanced version of the standard text generation node that provides more cont
 3. Restart ComfyUI.
 
 ## Usage
-The nodes can be found under the `anyMODE/LLM` category in the ComfyUI search menu.
+- **LLM Nodes**: Found under the `anyMODE/LLM` category.
+- **LoRA Nodes**: Found under the `anyMODE/LoRA` or `anyMODE/Sampling` categories.
