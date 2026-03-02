@@ -1,0 +1,8 @@
+{
+  "block_names": ["layers"],
+  "rules": [
+    { "policy": "keep", "match": [] },
+    { "policy": "float8_e4m3fn",  "match": [] },
+    { "policy": "nvfp4","match": [ "adaLN_modulation.0", "attention.out", "attention.qkv", "feed_forward" ] }
+  ]
+}
