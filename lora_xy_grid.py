@@ -68,7 +68,7 @@ def draw_label(image_tensor, text):
     labeled_np = np.array(pil_img).astype(np.float32) / 255.0
     return torch.from_numpy(labeled_np).unsqueeze(0)
 
-def generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, kwargs, sampler_func):
+def generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, image_differences, diff_target, kwargs, sampler_func):
     """
     Helper function to generate the grid.
     sampler_func signature: sampler_func(model_lora) -> samples
@@ -98,14 +98,33 @@ def generate_lora_grid(model, clip, vae, latent_image, strengths, columns, inclu
         # If strengths/loras are empty but baseline is enabled, we'll continue to generate just the baseline grid
 
     results = []
-    if include_baseline == "enable":
+    baseline_image = None
+
+    num_diffs = 0
+    if image_differences != "none":
+        if "baseline" in diff_target: num_diffs += 1
+        if "previous" in diff_target: num_diffs += 1
+        
+    outputs_per_combo = num_diffs
+    if image_differences in ["none", "both", "both magnified"]:
+        outputs_per_combo += 1
+        
+    needs_baseline = include_baseline == "enable" or (image_differences != "none" and "baseline" in diff_target)
+    
+    if needs_baseline:
         print(f"anyMODE: Sampling baseline (no LoRAs)")
         samples = sampler_func(model)
         images = vae.decode(samples[0]["samples"])
         if len(images.shape) == 5:
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
-        labeled_image = draw_label(images.cpu(), "Baseline\n(No LoRAs)")
-        results.append(labeled_image)
+        baseline_image = images.cpu()
+        
+        if include_baseline == "enable":
+            labeled_image = draw_label(baseline_image, "Baseline\n(No LoRAs)")
+            results.append(labeled_image)
+            for _ in range(outputs_per_combo - 1):
+                spacer = torch.zeros_like(labeled_image)
+                results.append(spacer)
 
     combinations = []
     for lora in selected_loras:
@@ -131,6 +150,7 @@ def generate_lora_grid(model, clip, vae, latent_image, strengths, columns, inclu
         else:
             lora_cache[lora_name] = None
     
+    previous_image = None
     for idx, (lora_name, strength) in enumerate(combinations):
         print(f"anyMODE: Sampling {idx+1}/{total} - {lora_name} @ {strength}")
         lora_data = lora_cache.get(lora_name)
@@ -143,9 +163,45 @@ def generate_lora_grid(model, clip, vae, latent_image, strengths, columns, inclu
         images = vae.decode(samples[0]["samples"])
         if len(images.shape) == 5: # Combine batches/frames for grid
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
-        label_text = f"{os.path.basename(lora_name)}\nS: {strength}"
-        labeled_image = draw_label(images.cpu(), label_text)
-        results.append(labeled_image)
+        lora_image = images.cpu()
+        
+        # Add original image if requested
+        if image_differences in ["none", "both", "both magnified"]:
+            label_text = f"{os.path.basename(lora_name)}\nS: {strength}"
+            labeled_image = draw_label(lora_image, label_text)
+            results.append(labeled_image)
+            
+        # Add difference image if requested
+        if image_differences != "none":
+            is_magnified = "magnified" in image_differences
+            
+            if "baseline" in diff_target and baseline_image is not None:
+                diff = torch.abs(lora_image[0:1] - baseline_image[0:1])
+                if is_magnified:
+                    diff = torch.clamp(diff * 5.0, 0.0, 1.0)
+                
+                diff_label = f"{os.path.basename(lora_name)}\nS: {strength} (-Base)"
+                if is_magnified:
+                    diff_label += " x5"
+                labeled_diff = draw_label(diff, diff_label)
+                results.append(labeled_diff)
+
+            if "previous" in diff_target:
+                if previous_image is not None:
+                    diff_prev = torch.abs(lora_image[0:1] - previous_image[0:1])
+                else:
+                    diff_prev = torch.zeros_like(lora_image[0:1])
+                
+                if is_magnified:
+                    diff_prev = torch.clamp(diff_prev * 5.0, 0.0, 1.0)
+                
+                diff_label_prev = f"{os.path.basename(lora_name)}\nS: {strength} (-Prev)"
+                if is_magnified:
+                    diff_label_prev += " x5"
+                labeled_diff_prev = draw_label(diff_prev, diff_label_prev)
+                results.append(labeled_diff_prev)
+                
+        previous_image = lora_image
 
     if not results:
         return (torch.zeros((1, 64, 64, 3)),)
@@ -207,6 +263,8 @@ class LoraXYIntegratedSampler:
             "strengths": ("STRING", {"multiline": True, "default": "1.0"}),
             "columns": ("INT", {"default": 3, "min": 1, "max": 100}),
             "include_baseline": (["disable", "enable"], {"default": "disable"}),
+            "image_differences": (["none", "both", "both magnified", "diff only", "diff magnified only"], {"default": "none"}),
+            "diff_target": (["baseline", "previous", "baseline & previous"], {"default": "baseline"}),
         })
         return inputs
 
@@ -214,11 +272,11 @@ class LoraXYIntegratedSampler:
     FUNCTION = "sample_grid"
     CATEGORY = "anyMODE/batch"
 
-    def sample_grid(self, model, clip, vae, positive, negative, latent_image, seed, steps, cfg, sampler_name, scheduler, denoise, strengths, columns, include_baseline, **kwargs):
+    def sample_grid(self, model, clip, vae, positive, negative, latent_image, seed, steps, cfg, sampler_name, scheduler, denoise, strengths, columns, include_baseline, image_differences, diff_target="baseline", **kwargs):
         def sampler_func(model_lora):
             return nodes.common_ksampler(model_lora, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)
         
-        return generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, kwargs, sampler_func)
+        return generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, image_differences, diff_target, kwargs, sampler_func)
 
 class LoraXYIntegratedSamplerCustom:
     @classmethod
@@ -236,6 +294,8 @@ class LoraXYIntegratedSamplerCustom:
             "strengths": ("STRING", {"multiline": True, "default": "1.0"}),
             "columns": ("INT", {"default": 3, "min": 1, "max": 100}),
             "include_baseline": (["disable", "enable"], {"default": "disable"}),
+            "image_differences": (["none", "both", "both magnified", "diff only", "diff magnified only"], {"default": "none"}),
+            "diff_target": (["baseline", "previous", "baseline & previous"], {"default": "baseline"}),
         })
         return inputs
 
@@ -243,13 +303,13 @@ class LoraXYIntegratedSamplerCustom:
     FUNCTION = "sample_grid"
     CATEGORY = "anyMODE/batch"
 
-    def sample_grid(self, model, clip, vae, add_noise, noise_seed, cfg, sampler, sigmas, positive, negative, latent_image, strengths, columns, include_baseline, **kwargs):
+    def sample_grid(self, model, clip, vae, add_noise, noise_seed, cfg, sampler, sigmas, positive, negative, latent_image, strengths, columns, include_baseline, image_differences, diff_target="baseline", **kwargs):
         from comfy_extras.nodes_custom_sampler import SamplerCustom
         
         def sampler_func(model_lora):
             return SamplerCustom().sample(model=model_lora, add_noise=add_noise=="enable", noise_seed=noise_seed, cfg=cfg, positive=positive, negative=negative, sampler=sampler, sigmas=sigmas, latent_image=latent_image)
 
-        return generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, kwargs, sampler_func)
+        return generate_lora_grid(model, clip, vae, latent_image, strengths, columns, include_baseline, image_differences, diff_target, kwargs, sampler_func)
 
 NODE_CLASS_MAPPINGS = {
     "LoraXYIntegratedSampler": LoraXYIntegratedSampler,
