@@ -12,20 +12,14 @@ NODE_CLASS_MAPPINGS = {
     "AnyTextGenerate": AnyTextGenerate,
     "LoraBlender": LoraBlend,
     "LoraXYIntegratedSampler": LoraXYIntegratedSampler,
-    "LoraXYIntegratedSamplerCustom": LoraXYIntegratedSamplerCustom,
-    "AnyModeQuantizer": AnyModeQuantizer,
-    "AnyModeCalibration": AnyModeCalibration,
-    "AnyModeSaveQuantizedWithCalibration": AnyModeSaveQuantizedWithCalibration,
+    "LoraXYIntegratedSamplerCustom": LoraXYIntegratedSamplerCustom
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "AnyTextGenerate": "Any Text Generate (with System Prompt)",
     "LoraBlender": "Lora Blender",
     "LoraXYIntegratedSampler": "LoRA XY Integrated Sampler",
-    "LoraXYIntegratedSamplerCustom": "LoRA XY Integrated Sampler (Custom)",
-    "AnyModeQuantizer": "anyMODE Quantizer",
-    "AnyModeCalibration": "anyMODE Calibration (Toggle)",
-    "AnyModeSaveQuantizedWithCalibration": "anyMODE Save Calibrated Model",
+    "LoraXYIntegratedSamplerCustom": "LoRA XY Integrated Sampler (Custom)"
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
