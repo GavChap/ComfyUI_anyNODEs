@@ -30,12 +30,12 @@ def get_grid_font():
         try:
             _GRID_FONT = ImageFont.truetype(p, 20)
             break
-        except:
+        except Exception:
             continue
     if _GRID_FONT is None:
         try:
             _GRID_FONT = ImageFont.load_default()
-        except:
+        except Exception:
             pass
     return _GRID_FONT
 
@@ -50,7 +50,7 @@ def draw_label(image_tensor, text):
 
     try:
         left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-    except:
+    except Exception:
         left, top, right, bottom = 0, 0, 100, 20
         
     text_w = right - left
