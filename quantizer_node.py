@@ -9,7 +9,7 @@ from .quantization import core, utils
 try:
     import comfy_kitchen
     comfy_kitchen.enable_backend("triton")
-except:
+except Exception:
     pass
 
 class AnyModeQuantizer:

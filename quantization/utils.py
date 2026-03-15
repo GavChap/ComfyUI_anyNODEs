@@ -74,18 +74,12 @@ def dequantize_per_tensor_int8(x, scale):
 
 def quantize_rowwise_int8(x, scales):
     x_float = x.float()
-    quantized = torch.zeros_like(x, dtype=torch.int8)
-    for i in range(scales.numel()):
-        row = x_float[i] * (1.0 / scales[i])
-        quantized[i] = torch.clamp(row.round(), -128, 127).to(torch.int8)
-    return quantized
+    # scales shape: (rows,) -> (rows, 1) for broadcasting
+    inv_scales = (1.0 / scales).unsqueeze(-1)
+    return (x_float * inv_scales).round().clamp(-128, 127).to(torch.int8)
 
 def dequantize_rowwise_int8(x, scales):
-    x_float = x.float()
-    dequantized = torch.zeros_like(x_float)
-    for i in range(scales.numel()):
-        dequantized[i] = x_float[i] * scales[i]
-    return dequantized
+    return x.float() * scales.unsqueeze(-1)
 
 # Utility Functions from scale_search.py
 def sample_flat(w, n, include_absmax=True):
