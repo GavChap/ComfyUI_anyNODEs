@@ -1,11 +1,30 @@
 import os
+import sys
 import json
 import torch
 import folder_paths
-import extra.calibration as calibration
 from .quantization import utils, core
 from safetensors.torch import save_file
 from safetensors import safe_open
+
+# extra.calibration is a ComfyUI-internal module that may not be directly
+# importable depending on sys.path. Try multiple resolution strategies.
+calibration = None
+try:
+    import extra.calibration as calibration
+except ImportError:
+    # Fall back: try importing relative to the ComfyUI base directory
+    try:
+        comfy_base = os.path.dirname(folder_paths.base_path) if hasattr(folder_paths, 'base_path') else None
+        if comfy_base and comfy_base not in sys.path:
+            sys.path.insert(0, comfy_base)
+            import extra.calibration as calibration
+    except (ImportError, AttributeError):
+        pass
+
+if calibration is None:
+    print("[anyMODE] Warning: 'extra.calibration' module not found. Calibration nodes will be disabled.")
+    print("[anyMODE] This module is part of a custom ComfyUI fork with calibration support.")
 
 class AnyModeCalibration:
     @classmethod
@@ -17,27 +36,22 @@ class AnyModeCalibration:
                 "clear_data": ("BOOLEAN", {"default": False}),
             }
         }
-    
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "toggle"
     CATEGORY = "anyMODE/calibration"
 
     def toggle(self, model, enabled, clear_data):
+        if calibration is None:
+            print("[anyMODE] Calibration module not available. Cannot toggle calibration.")
+            return (model,)
+
         calibration.set_enabled(enabled)
         if clear_data:
             calibration.CALIB_DATA.clear()
             calibration.MODEL_SIGMA_RANGE.clear()
             print("Calibration data cleared.")
-        
-        # We don't necessarily need to modify the model here, 
-        # but if calibration is enabled, future samplings will record data.
-        # However, to be sure the model is using the right ops, 
-        # we might want to reload it or ensure it's using MixedPrecisionOps.
-        
-        # If the model was loaded while calibration was disabled, it might not have the hooks.
-        # But comfy/ops.py checks calibration.ENABLED at runtime in forward().
-        # So as long as it's using MixedPrecisionOps, it's fine.
-        
+
         return (model,)
 
 class AnyModeSaveQuantizedWithCalibration:
@@ -57,8 +71,10 @@ class AnyModeSaveQuantizedWithCalibration:
     CATEGORY = "anyMODE/calibration"
 
     def save(self, model, save_path, calibration_margin):
-        # This logic is adapted from add_input_scale.py
-        
+        if calibration is None:
+            print("[anyMODE] Calibration module not available. Cannot save calibrated model.")
+            return {}
+
         calib_data = calibration.CALIB_DATA
         if not calib_data:
             print("Warning: No calibration data found!")
@@ -135,7 +151,7 @@ class AnyModeSaveQuantizedWithCalibration:
                     try:
                         qconf = json.loads(sd[qconf_key].numpy().tobytes())
                         qfmt = qconf.get("format")
-                    except:
+                    except (json.JSONDecodeError, ValueError, RuntimeError):
                         pass
             
             if not qfmt:
