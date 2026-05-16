@@ -4,12 +4,12 @@ import os
 import comfy_kitchen as ck
 from . import utils
 
-def quantize_weight(weight, key, quantized_state_dict, quantization_layers, qtype, qformat, method, n_samples, device, verbose=True):
+def quantize_weight(weight, key, quantized_state_dict, quantization_layers, qtype, qformat, method, n_samples, device, stochastic=False, dense_search=False, verbose=True):
     layer_name = key[:-7] if key.endswith(".weight") else key
     
     if qtype == "nvfp4":
         if method == "mse":
-            weight_scale_2 = utils.scale_mse_nvfp4(weight, n_samples=n_samples)
+            weight_scale_2 = utils.scale_mse_nvfp4(weight, n_samples=n_samples, dense_search=dense_search)
         else:
             weight_scale_2 = utils.scale_amax_nvfp4(weight)
         weight_quantized, weight_scale = ck.quantize_nvfp4(weight, weight_scale_2)
@@ -28,7 +28,7 @@ def quantize_weight(weight, key, quantized_state_dict, quantization_layers, qtyp
           weight_scale = utils.scale_mse_int8(weight, n_samples=n_samples)
         else:
           weight_scale = utils.scale_amax_int8(weight)
-        weight_quantized = utils.quantize_per_tensor_int8(weight, weight_scale)
+        weight_quantized = utils.quantize_per_tensor_int8(weight, weight_scale, stochastic=stochastic)
         if verbose: utils.print_layer_metrics(layer_name, weight, weight_quantized, weight_scale)
         quantized_state_dict[key] = weight_quantized.cpu()
         quantized_state_dict[f"{layer_name}.weight_scale"] = weight_scale.cpu()
@@ -37,7 +37,7 @@ def quantize_weight(weight, key, quantized_state_dict, quantization_layers, qtyp
             weight_scales = utils.scale_rowwise_percentile_int8(weight)
         else:
             weight_scales = utils.scale_rowwise_amax_int8(weight)
-        weight_quantized = utils.quantize_rowwise_int8(weight, weight_scales)
+        weight_quantized = utils.quantize_rowwise_int8(weight, weight_scales, stochastic=stochastic)
         if verbose: print(f"Int8 Rowwise: {layer_name}")
         quantized_state_dict[key] = weight_quantized.cpu()
         quantized_state_dict[f"{layer_name}.weight_scale"] = weight_scales.cpu()
@@ -84,7 +84,7 @@ def first_matching_qtype_for_key(key, rules):
                 return qtype if qtype in utils.ALLOWED_QTYPES else None
     return None
 
-def process_state_dict(state_dict, config, method, n_samples, downcast_fp32, device, verbose=True):
+def process_state_dict(state_dict, config, method, n_samples, downcast_fp32, device, stochastic=False, dense_search=False, verbose=True):
     cast_to = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(downcast_fp32, None)
     qformat = config.get("format", "comfy_quant")
     block_names = config.get("block_names", ["block", "transformer", "layer", "model.diffusion_model"])
@@ -119,7 +119,7 @@ def process_state_dict(state_dict, config, method, n_samples, downcast_fp32, dev
         else:
             if verbose:
                 print(f"Quantizing {original_key} as {qtype}")
-            quantize_weight(tensor.to(device), original_key, quantized_state_dict, quantization_layers, qtype, qformat, method, n_samples, device, verbose=verbose)
+            quantize_weight(tensor.to(device), original_key, quantized_state_dict, quantization_layers, qtype, qformat, method, n_samples, device, stochastic=stochastic, dense_search=dense_search, verbose=verbose)
 
     metadata = None
     if qformat != "comfy_quant":

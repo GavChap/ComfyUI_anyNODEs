@@ -26,6 +26,15 @@ except Exception as e:
     print(f"[anyMODE] Failed to load LoraXY nodes: {e}")
 
 try:
+    from .model_xy_grid import ModelXYIntegratedSampler, ModelXYIntegratedSamplerCustom
+    NODE_CLASS_MAPPINGS["ModelXYIntegratedSampler"] = ModelXYIntegratedSampler
+    NODE_CLASS_MAPPINGS["ModelXYIntegratedSamplerCustom"] = ModelXYIntegratedSamplerCustom
+    NODE_DISPLAY_NAME_MAPPINGS["ModelXYIntegratedSampler"] = "Model XY Integrated Sampler"
+    NODE_DISPLAY_NAME_MAPPINGS["ModelXYIntegratedSamplerCustom"] = "Model XY Integrated Sampler (Custom)"
+except Exception as e:
+    print(f"[anyMODE] Failed to load ModelXY nodes: {e}")
+
+try:
     from .quantizer_node import AnyModeQuantizer
     NODE_CLASS_MAPPINGS["AnyModeQuantizer"] = AnyModeQuantizer
     NODE_DISPLAY_NAME_MAPPINGS["AnyModeQuantizer"] = "anyMODE Quantizer"
@@ -41,6 +50,19 @@ try:
 except Exception as e:
     print(f"[anyMODE] Failed to load calibration nodes: {e}")
 
-WEB_DIRECTORY = "js"
+try:
+    from .any_model_merge import AnyModelMerge10
+    NODE_CLASS_MAPPINGS["AnyModelMerge10"] = AnyModelMerge10
+    NODE_DISPLAY_NAME_MAPPINGS["AnyModelMerge10"] = "anyMODE Model Merge (10)"
+except Exception as e:
+    print(f"[anyMODE] Failed to load AnyModelMerge10: {e}")
 
+try:
+    from .lora_dir_sampler import NODE_CLASS_MAPPINGS as LORA_DIR_CM, NODE_DISPLAY_NAME_MAPPINGS as LORA_DIR_DNM
+    NODE_CLASS_MAPPINGS.update(LORA_DIR_CM)
+    NODE_DISPLAY_NAME_MAPPINGS.update(LORA_DIR_DNM)
+except Exception as e:
+    print(f"[anyMODE] Failed to load LoraDirectorySampler: {e}")
+
+WEB_DIRECTORY = "js"
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

@@ -23,10 +23,12 @@ class AnyModeQuantizer:
         return {
             "required": {
                 "model": ("MODEL",),
-                "config_name": (configs, {"default": "flux-2-klein-9b-nvfp4.json" if "flux-2-klein-9b-nvfp4.json" in configs else configs[0]}),
+                "config_name": (configs, {"default": configs[1] if len(configs) > 1 else configs[0]}),
                 "custom_config": ("STRING", {"multiline": True, "default": "{}"}),
                 "method": (["mse", "amax", "percentile"], {"default": "mse"}),
                 "n_samples": ("INT", {"default": 131072, "min": 0, "max": 1000000, "step": 1024}),
+                "stochastic_rounding": ("BOOLEAN", {"default": True}),
+                "dense_search": ("BOOLEAN", {"default": False}),
                 "downcast_fp32": (["none", "fp16", "bf16"], {"default": "none"}),
                 "save_model": ("BOOLEAN", {"default": False}),
                 "save_path": ("STRING", {"default": "quantized/model.safetensors"}),
@@ -37,7 +39,7 @@ class AnyModeQuantizer:
     FUNCTION = "quantize"
     CATEGORY = "anyMODE"
 
-    def quantize(self, model, config_name, custom_config, method, n_samples, downcast_fp32, save_model, save_path):
+    def quantize(self, model, config_name, custom_config, method, n_samples, stochastic_rounding, dense_search, downcast_fp32, save_model, save_path):
         device = utils.get_device()
         
         # Load config
@@ -48,19 +50,13 @@ class AnyModeQuantizer:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
         
-        # Get state dict
-        # We need the full state dict. ComfyUI's model patcher doesn't easily give the full state dict in one go
-        # if it's not loaded. But usually, we can get it from model.model.state_dict().
-        # However, it's better to use the model patcher's load_device if it's already there or loaded.
-        
         print(f"Quantizing model using config: {config_name}")
         
         # Pull the state dict from the model patcher
-        # Note: this might load the whole model into memory.
         sd = model.model.state_dict()
         
         # Process quantization
-        new_sd, metadata = core.process_state_dict(sd, config, method, n_samples, downcast_fp32, device, verbose=True)
+        new_sd, metadata = core.process_state_dict(sd, config, method, n_samples, downcast_fp32, device, stochastic=stochastic_rounding, dense_search=dense_search, verbose=True)
         
         # Save if requested
         if save_model:
@@ -69,19 +65,7 @@ class AnyModeQuantizer:
             print(f"Saving quantized model to {full_save_path}")
             save_file(new_sd, full_save_path, metadata=metadata)
         
-        # Create a new model patcher with the quantized weights
-        # We can try to patch the existing model or create a new one.
-        # ComfyUI's ModelPatcher expects the weights to be in the state dict.
-        # But we also need to make sure the model knows how to handle the quantized tensors.
-        # ComfyUI's ops.py handles 'comfy_quant' metadata.
-        
         new_model = model.clone()
-        # This is a bit tricky. We want to replace the model's weights.
-        # Actually, if we just update the model.model.load_state_dict(new_sd), it should work
-        # but ModelPatcher might have its own ideas.
-        
-        # A safer way in ComfyUI is to create a new model object if possible, 
-        # but here we can just replace the internal model weights.
         new_model.model.load_state_dict(new_sd, strict=False)
         
         return (new_model,)

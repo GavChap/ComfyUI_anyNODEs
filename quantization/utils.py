@@ -66,13 +66,18 @@ def print_layer_metrics(layer_name, original, quantized, global_scale=None, bloc
     print(f"{layer_name:<35} {str(quantized.dtype).partition('.')[2][:10]:>10} {gs} {fixed_e(mse, 6, 3):>10} {psnr:>6.4f} {sqnr:>6.4f} {cos_sim*100:8.4f} {rel_max_err*100:>8.4f}")
 
 # Utility Functions from quant_method.py
-def quantize_per_tensor_int8(x, scale):
-    return x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
+def quantize_per_tensor_int8(x, scale, stochastic=False):
+    x_scaled = x.float().mul(1.0 / scale)
+    if stochastic:
+        x_scaled.add_(torch.rand_like(x_scaled)).floor_()
+    else:
+        x_scaled.round_()
+    return x_scaled.clamp_(-128.0, 127.0).to(torch.int8)
 
 def dequantize_per_tensor_int8(x, scale):
     return x.float() * scale
 
-def quantize_rowwise_int8(x, scales):
+def quantize_rowwise_int8(x, scales, stochastic=False):
     x_float = x.float()
     # scales shape: (rows,) -> (rows, 1) for broadcasting
     inv_scales = (1.0 / scales).unsqueeze(-1)
@@ -116,7 +121,8 @@ def sample_block16(w, n, include_absmax=True):
         bidx = torch.cat([bidx, w.new_tensor([ac // 16], dtype=torch.long)])
     return x16[ridx, bidx].float()
 
-def scale_mse_nvfp4(w, n_samples=NUM_SAMPLE_DEFAULT, ratios=(0.90, 0.95, 0.975, 1.0, 1.025, 1.05, 1.10)):
+def scale_mse_nvfp4(w, n_samples=NUM_SAMPLE_DEFAULT, dense_search=False):
+    ratios = tuple(0.65 + 0.0125 * i for i in range(49)) if dense_search else (0.90, 0.95, 0.975, 1.0, 1.025, 1.05, 1.10)
     x = sample_block16(w, n_samples) if n_samples is not None else w.float()
     if x.numel() == 0: return w.new_tensor(0.0, dtype=torch.float32)
     amax = torch.amax(x.abs())
